@@ -1,0 +1,10 @@
+cluster:
+  name: dev
+  # The server URL for the Kubernetes cluster
+  # Use 'https://kubernetes.default.svc' for in-cluster
+  # Or the actual cluster API server URL for remote clusters
+  server: https://kubernetes.default.svc
+  # Default namespace where ArgoCD manages resources
+  namespace: argocd
+  # Optional: Environment label for filtering
+  environment: development

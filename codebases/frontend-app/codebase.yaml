@@ -1,0 +1,22 @@
+codebase:
+  # Name of the codebase/application
+  name: frontend-app
+
+  # Repository URL where the Helm chart is located
+  # This should point to your application's repository
+  repoURL: https://github.com/myorg/frontend-app
+
+  # Path within the repository where the Helm chart is located
+  # This is your deploy-templates directory
+  chartPath: deploy-templates
+
+  # Target revision (branch, tag, or commit)
+  targetRevision: main
+
+  # Namespace where the application will be deployed
+  # If not specified, defaults to the codebase name
+  namespace: frontend
+
+  # Optional: Additional metadata
+  description: "Frontend web application"
+  team: "frontend-team"

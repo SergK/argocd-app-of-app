@@ -1,0 +1,40 @@
+# Values overrides for data-processor in prod cluster
+
+image:
+  tag: "v3.0.5"
+  pullPolicy: IfNotPresent
+
+# CronJob schedule (runs every 15 minutes in production)
+schedule: "*/15 * * * *"
+
+job:
+  backoffLimit: 5
+  restartPolicy: OnFailure
+  # Production jobs have longer timeout
+  activeDeadlineSeconds: 3600
+
+resources:
+  limits:
+    cpu: 8000m
+    memory: 8Gi
+  requests:
+    cpu: 2000m
+    memory: 2Gi
+
+env:
+  - name: ENVIRONMENT
+    value: "production"
+  - name: DATA_SOURCE
+    value: "s3://prod-bucket/data"
+  - name: LOG_LEVEL
+    value: "warn"
+  - name: BATCH_SIZE
+    value: "1000"
+  - name: ENABLE_MONITORING
+    value: "true"
+
+concurrencyPolicy: Forbid
+
+# Keep successful jobs for audit
+successfulJobsHistoryLimit: 5
+failedJobsHistoryLimit: 3

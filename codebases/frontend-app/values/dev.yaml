@@ -1,0 +1,41 @@
+# Values overrides for frontend-app in dev cluster
+# These values override the defaults from the remote Helm chart
+# located at https://github.com/myorg/frontend-app/deploy-templates
+
+# Image configuration
+image:
+  tag: "dev-latest"
+  pullPolicy: Always
+
+# Replica count for development
+replicaCount: 1
+
+# Resource limits for dev environment
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Ingress configuration
+ingress:
+  enabled: true
+  host: frontend-dev.example.com
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-staging
+
+# Environment-specific variables
+env:
+  - name: ENVIRONMENT
+    value: "development"
+  - name: API_URL
+    value: "https://api-dev.example.com"
+  - name: LOG_LEVEL
+    value: "debug"
+
+# Feature flags
+features:
+  analytics: false
+  experimental: true
