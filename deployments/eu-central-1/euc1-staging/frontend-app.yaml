@@ -1,0 +1,6 @@
+cluster:
+  server: https://euc1-staging-k8s.example.com
+  namespace: argocd
+  environment: staging
+
+deployment: {}

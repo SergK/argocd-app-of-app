@@ -1,0 +1,12 @@
+# Example: Emergency hotfix override
+# This shows how to override the targetRevision for a specific cluster
+# To use: rename to backend-api.yaml and replace the existing file
+
+cluster:
+  server: https://kubernetes.default.svc
+  namespace: argocd
+  environment: development
+
+deployment:
+  # Override targetRevision to deploy a hotfix branch
+  targetRevision: hotfix/security-patch-2024-001

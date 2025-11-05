@@ -1,4 +1,7 @@
 ---
+# Cluster-Oriented Deployment ApplicationSet
+# Creates Applications only when deployment marker files exist
+# File path: deployments/{region}/{cluster}/{codebase}.yaml
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -9,30 +12,36 @@ spec:
   goTemplateOptions: ["missingkey=error"]
 
   generators:
-    # Matrix generator combines cluster config with all codebases
+    # Two-generator Matrix for selective deployment
     - matrix:
         generators:
-          # First generator: Read cluster configuration
+          # Generator 1: Scan deployment marker files
+          # Path structure: deployments/{region}/{cluster}/{codebase}.yaml
+          # Provides: region (path[1]), cluster (path[2]), codebase (filename), cluster config (file content)
           - git:
               repoURL: '{{.Values.repoURL}}'
               revision: '{{.Values.revision}}'
               files:
-                - path: 'clusters/{{.Values.clusterName}}/config.yaml'
+                - path: 'deployments/{{.Values.region}}/{{.Values.clusterName}}/*.yaml'
 
-          # Second generator: Scan all codebase directories
+          # Generator 2: Load codebase configuration
+          # Uses codebase name from Generator 1 to load the right codebase.yaml
           - git:
               repoURL: '{{.Values.repoURL}}'
               revision: '{{.Values.revision}}'
               files:
-                - path: 'codebases/*/codebase.yaml'
+                - path: 'codebases/{{.path.basenameNormalized}}/codebase.yaml'
 
   template:
     metadata:
       # Application name: <cluster>-<codebase>
-      name: '{{.cluster.name}}-{{.codebase.name}}'
+      # path[2] = cluster name (e.g., euc1-dev)
+      # path.basenameNormalized = codebase name (e.g., frontend-app)
+      name: '{{.path[2]}}-{{.path.basenameNormalized}}'
       labels:
-        codebase: '{{.codebase.name}}'
-        cluster: '{{.cluster.name}}'
+        codebase: '{{.path.basenameNormalized}}'
+        cluster: '{{.path[2]}}'
+        region: '{{.path[1]}}'
         environment: '{{.cluster.environment}}'
       # Finalizers ensure proper cleanup
       finalizers:
@@ -43,13 +52,20 @@ spec:
       sources:
         # Source 1: Remote Helm chart from codebase repository
         - repoURL: '{{.codebase.repoURL}}'
-          targetRevision: '{{default "main" .codebase.targetRevision}}'
+          # Version resolution priority:
+          # 1. deployment.targetRevision (override from deployment file)
+          # 2. codebase.targetRevisions[region][environment] (from codebase.yaml matrix)
+          targetRevision: '{{if .deployment.targetRevision}}{{.deployment.targetRevision}}{{else}}{{index (index .codebase.targetRevisions .path[1]) .cluster.environment}}{{end}}'
           path: '{{.codebase.chartPath}}'
           helm:
+            # Override release name to use short codebase name instead of full Application name
+            # This keeps Helm release names clean (e.g., "frontend-app" instead of "euc1-dev-frontend-app")
+            releaseName: '{{.path.basenameNormalized}}'
             valueFiles:
               - values.yaml  # Default values from the remote chart
               # Reference values from this repository (second source)
-              - $values/codebases/{{.codebase.name}}/values/{{.cluster.name}}.yaml
+              # Path: codebases/{codebase}/values/{region}/{environment}.yaml
+              - $values/codebases/{{.path.basenameNormalized}}/values/{{.path[1]}}/{{.cluster.environment}}.yaml
 
         # Source 2: Values overrides from this repository
         - repoURL: '{{.Values.repoURL}}'
@@ -58,7 +74,7 @@ spec:
 
       destination:
         server: '{{.cluster.server}}'
-        namespace: '{{default .codebase.name .codebase.namespace}}'
+        namespace: '{{.codebase.namespace}}'
 
       syncPolicy:
         automated:

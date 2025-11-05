@@ -1,0 +1,6 @@
+cluster:
+  server: https://euc1-prod-k8s.example.com
+  namespace: argocd
+  environment: production
+
+deployment: {}
