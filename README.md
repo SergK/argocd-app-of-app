@@ -5,6 +5,7 @@ This repository implements an apps-of-apps pattern using ArgoCD ApplicationSet t
 ## Overview
 
 This GitOps repository manages deployments by:
+
 - **Automatically generating ArgoCD Applications** based on codebase and cluster combinations
 - **Deploying from remote Helm charts** located in application repositories
 - **Applying cluster-specific value overrides** from this repository
@@ -21,6 +22,7 @@ kubectl apply -f bootstrap/root-appset.yaml -n argocd
 ```
 
 This will:
+
 - Scan the `clusters/` directory
 - Create one ApplicationSet per cluster
 - Each cluster ApplicationSet will scan `codebases/` and create Applications
@@ -40,6 +42,7 @@ kubectl get applications -n argocd
 ```
 
 You should see Applications like:
+
 - `dev-frontend-app`
 - `staging-frontend-app`
 - `prod-frontend-app`
@@ -48,7 +51,7 @@ You should see Applications like:
 
 ## Repository Structure
 
-```
+```bash
 ├── bootstrap/              # Entry point - apply this first
 │   └── root-appset.yaml   # Root ApplicationSet
 │
@@ -76,7 +79,7 @@ You should see Applications like:
 
 ### Application Generation Flow
 
-```
+```text
 Root ApplicationSet
     ↓ (scans clusters/)
 Per-Cluster ApplicationSets
@@ -121,6 +124,7 @@ spec:
 **Helm Release Names**: The Helm `releaseName` is set to just the codebase name (e.g., `frontend-app`). This keeps Helm release names clean and consistent across all clusters, avoiding long names like `dev-frontend-app`.
 
 Benefits:
+
 - Consistent Helm release names across environments
 - Easier to reference in Helm commands: `helm list -n frontend` shows `frontend-app` in all clusters
 - Resource names remain the same regardless of cluster (e.g., Deployment is always `frontend-app`, not `dev-frontend-app`)
@@ -206,6 +210,7 @@ ArgoCD will create a new ApplicationSet for the QA cluster and deploy all codeba
 ### Updating the Repository URL
 
 Before deploying, update the repository URL in:
+
 - `bootstrap/root-appset.yaml` - Change `repoURL` to your repository
 - Update the example URLs in this README
 
@@ -216,6 +221,7 @@ Update cluster server URLs in `clusters/*/config.yaml` to match your actual Kube
 ### Sync Policies
 
 All ApplicationSets are configured with automated sync:
+
 - `prune: true` - Remove resources when removed from Git
 - `selfHeal: true` - Auto-sync when resources drift
 
@@ -243,6 +249,7 @@ argocd app get <name>
 ### Values Override Not Applied
 
 Ensure:
+
 1. Values file exists at `codebases/<codebase>/values/<cluster>.yaml`
 2. File is committed to Git
 3. ArgoCD has synced the ApplicationSet
@@ -252,6 +259,7 @@ Ensure:
 ### Using Secrets
 
 For sensitive values:
+
 - Use ArgoCD Vault Plugin
 - Use External Secrets Operator
 - Use Sealed Secrets
@@ -271,6 +279,7 @@ env:
 ### Multiple Sources
 
 The ApplicationSet uses multiple sources:
+
 - Remote Helm chart (primary)
 - Local values repository (overrides)
 
@@ -291,6 +300,7 @@ To deploy only certain codebases to certain clusters, modify the ApplicationSet 
 ## Support
 
 For issues or questions:
+
 1. Check the [troubleshooting section](#troubleshooting)
 2. Review the [documentation](./docs/)
 3. Open an issue in this repository

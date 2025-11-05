@@ -12,7 +12,7 @@ This repository implements an apps-of-apps pattern using ArgoCD ApplicationSet t
 
 ## Repository Structure
 
-```
+```bash
 argocd-app-of-app/
 ├── README.md                           # Repository overview and getting started
 ├── DESIGN.md                           # This design document
@@ -62,6 +62,7 @@ argocd-app-of-app/
 ### 1. Bootstrap Layer
 
 The `bootstrap/root-appset.yaml` is the entry point. This ApplicationSet:
+
 - Uses Git Directory generator to scan the `clusters/` directory
 - Creates one ApplicationSet per cluster
 - Each cluster ApplicationSet will scan codebases and create Applications
@@ -81,6 +82,7 @@ cluster:
 ### 3. Codebase Definitions
 
 Each codebase has:
+
 - A `codebase.yaml` file with metadata
 - A `values/` directory with cluster-specific overrides
 
@@ -111,13 +113,14 @@ The design uses a layered ApplicationSet approach:
 ### 5. Values Override Strategy
 
 Values are organized hierarchically:
+
 - Remote Helm chart contains default values
 - `codebases/<codebase>/values/<cluster>.yaml` provides cluster-specific overrides
 - ArgoCD merges these using Helm's values precedence
 
 ## Application Generation Flow
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │  Bootstrap Root ApplicationSet                              │
 │  (bootstrap/root-appset.yaml)                              │
@@ -153,12 +156,14 @@ Values are organized hierarchically:
 ### Self-Service Onboarding
 
 To add a new codebase:
+
 1. Create directory under `codebases/<new-codebase>/`
 2. Add `codebase.yaml` with repository and chart information
 3. Add values overrides in `codebases/<new-codebase>/values/<cluster>.yaml`
 4. Commit and push - ApplicationSet automatically creates Applications
 
 To add a new cluster:
+
 1. Create directory under `clusters/<new-cluster>/`
 2. Add `config.yaml` with cluster information
 3. Commit and push - ApplicationSet automatically creates cluster ApplicationSet
@@ -166,10 +171,12 @@ To add a new cluster:
 ### Values Override Mechanism
 
 Applications use multiple values files:
+
 1. Default values from remote Helm chart
 2. Cluster-specific overrides from this repository
 
 Example Application spec:
+
 ```yaml
 spec:
   sources:
@@ -191,6 +198,7 @@ spec:
 ### Git-Based Automation
 
 All changes are GitOps-driven:
+
 - Add/remove codebases by modifying `codebases/` directory
 - Add/remove clusters by modifying `clusters/` directory
 - Update values by modifying files in `codebases/*/values/*.yaml`
@@ -211,16 +219,19 @@ Based on Akuity workshops and ArgoCD best practices:
 ## Alternative Approaches
 
 ### Approach 1: Matrix Generator (Current Design)
+
 - Uses nested generators to create codebase × cluster matrix
 - Pros: Automatic combination of all codebases with all clusters
 - Cons: Less granular control over which codebase goes to which cluster
 
 ### Approach 2: Git File Generator
+
 - Uses a single config file listing all codebase-cluster pairs
 - Pros: Explicit control over deployments
 - Cons: Manual maintenance of combinations
 
 ### Approach 3: List Generator
+
 - Hardcoded list of codebases and clusters
 - Pros: Simple and explicit
 - Cons: Not GitOps-friendly, requires ApplicationSet changes

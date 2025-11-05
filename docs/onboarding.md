@@ -13,11 +13,13 @@ This guide walks you through onboarding new applications and clusters to the Arg
 ### Step 1: Prepare Your Application Repository
 
 Your application repository should have:
+
 - A Helm chart in the `deploy-templates` directory (or another path you specify)
 - Default `values.yaml` with all configurable parameters
 
 Example repository structure:
-```
+
+```bash
 my-app/
 ├── src/              # Application source code
 ├── deploy-templates/ # Helm chart
@@ -126,6 +128,7 @@ kubectl get applications -n argocd | grep my-app
 ```
 
 You should see:
+
 - `dev-my-app`
 - `staging-my-app`
 - `prod-my-app`
@@ -249,6 +252,7 @@ codebase:
 If you want to deploy the same app to different namespaces per cluster, use values overrides:
 
 In `codebase.yaml`, omit the namespace:
+
 ```yaml
 codebase:
   name: my-app
@@ -256,11 +260,13 @@ codebase:
 ```
 
 In `values/dev.yaml`, add:
+
 ```yaml
 namespace: my-app-dev
 ```
 
 In `values/prod.yaml`, add:
+
 ```yaml
 namespace: my-app-prod
 ```
@@ -273,6 +279,7 @@ To deploy a codebase only to specific clusters, you can:
 2. Modify ApplicationSet generators to filter based on labels
 
 Example: Deploy only to dev and staging:
+
 ```bash
 # Only create these files
 touch codebases/my-app/values/dev.yaml
@@ -293,11 +300,13 @@ You'll need to modify the ApplicationSet template in `applicationsets/cluster-ap
 **Symptom**: No Application appears after onboarding
 
 **Possible Causes**:
+
 1. ApplicationSet hasn't synced yet
 2. Values file missing for cluster
 3. Syntax error in YAML files
 
 **Solution**:
+
 ```bash
 # Force ApplicationSet refresh
 kubectl patch applicationset <cluster>-apps -n argocd \
@@ -316,12 +325,14 @@ ls -la codebases/my-app/values/
 **Symptom**: Application created but sync fails
 
 **Possible Causes**:
+
 1. Invalid Helm chart
 2. Missing dependencies
 3. Resource quota exceeded
 4. RBAC issues
 
 **Solution**:
+
 ```bash
 # Check Application details
 argocd app get <app-name>
@@ -338,11 +349,13 @@ argocd app logs <app-name>
 **Symptom**: Values from override file not being used
 
 **Possible Causes**:
+
 1. File not committed to Git
 2. Wrong file path or name
 3. YAML syntax error
 
 **Solution**:
+
 ```bash
 # Verify file is in Git
 git log -- codebases/my-app/values/dev.yaml
@@ -359,6 +372,7 @@ kubectl get application dev-my-app -n argocd -o yaml
 **Symptom**: Error about multiple sources not supported
 
 **Solution**: Ensure you're using ArgoCD v2.6+ which supports multiple sources. Check version:
+
 ```bash
 argocd version
 ```
@@ -404,6 +418,7 @@ argocd version
 ## Getting Help
 
 If you encounter issues:
+
 1. Check the [Troubleshooting](#troubleshooting) section
 2. Review ArgoCD logs: `kubectl logs -n argocd deployment/argocd-applicationset-controller`
 3. Consult the [Architecture documentation](./architecture.md)
