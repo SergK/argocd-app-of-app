@@ -42,9 +42,9 @@ This document describes the architecture of the ArgoCD apps-of-apps system, whic
 │  ┌─────────────────────────────────────────────────────────┐      │
 │  │           Generated Applications                        │      │
 │  │                                                          │      │
-│  │  frontend-app-dev      frontend-app-staging  ...        │      │
-│  │  backend-api-dev       backend-api-staging   ...        │      │
-│  │  data-proc-dev         data-proc-staging     ...        │      │
+│  │  dev-frontend-app      staging-frontend-app  ...        │      │
+│  │  dev-backend-api       staging-backend-api   ...        │      │
+│  │  dev-data-proc         staging-data-proc     ...        │      │
 │  └──────────────────────────────────────────────────────────┘      │
 └─────────────────────────────────────────────────────────────────────┘
                                 │
@@ -217,7 +217,7 @@ generators:
 
 Each Application represents a deployment of a codebase to a cluster.
 
-**Naming Convention**: `<codebase>-<cluster>` (e.g., `frontend-app-dev`)
+**Naming Convention**: `<cluster>-<codebase>` (e.g., `dev-frontend-app`)
 
 **Key Features**:
 - Multiple sources (ArgoCD 2.6+)
@@ -229,7 +229,7 @@ Each Application represents a deployment of a codebase to a cluster.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: frontend-app-dev
+  name: dev-frontend-app
 spec:
   sources:
     # Source 1: Remote Helm chart
@@ -298,9 +298,9 @@ Each application has its own Git repository containing:
    - New codebase detected in scan
 
 3. **Applications Created**:
-   - `new-app-dev`
-   - `new-app-staging`
-   - `new-app-prod`
+   - `dev-new-app`
+   - `staging-new-app`
+   - `prod-new-app`
 
 4. **Auto-Sync** deploys to clusters
 

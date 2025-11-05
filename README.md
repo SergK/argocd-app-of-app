@@ -40,10 +40,10 @@ kubectl get applications -n argocd
 ```
 
 You should see Applications like:
-- `frontend-app-dev`
-- `frontend-app-staging`
-- `frontend-app-prod`
-- `backend-api-dev`
+- `dev-frontend-app`
+- `staging-frontend-app`
+- `prod-frontend-app`
+- `dev-backend-api`
 - etc.
 
 ## Repository Structure
@@ -92,7 +92,7 @@ For codebase `frontend-app` and cluster `dev`, an Application is created:
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: frontend-app-dev
+  name: dev-frontend-app
 spec:
   sources:
     # Source 1: Remote Helm chart

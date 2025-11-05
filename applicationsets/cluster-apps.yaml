@@ -28,8 +28,8 @@ spec:
 
   template:
     metadata:
-      # Application name: <codebase>-<cluster>
-      name: '{{.codebase.name}}-{{.cluster.name}}'
+      # Application name: <cluster>-<codebase>
+      name: '{{.cluster.name}}-{{.codebase.name}}'
       labels:
         codebase: '{{.codebase.name}}'
         cluster: '{{.cluster.name}}'

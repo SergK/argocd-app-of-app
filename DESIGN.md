@@ -136,15 +136,15 @@ Values are organized hierarchically:
                   ▼
 ┌─────────────────────────────────────────────────────────────┐
 │  Generates Applications (codebase × cluster matrix)         │
-│  - frontend-app-dev                                         │
-│  - frontend-app-staging                                     │
-│  - frontend-app-prod                                        │
-│  - backend-api-dev                                          │
-│  - backend-api-staging                                      │
-│  - backend-api-prod                                         │
-│  - data-processor-dev                                       │
-│  - data-processor-staging                                   │
-│  - data-processor-prod                                      │
+│  - dev-frontend-app                                         │
+│  - staging-frontend-app                                     │
+│  - prod-frontend-app                                        │
+│  - dev-backend-api                                          │
+│  - staging-backend-api                                      │
+│  - prod-backend-api                                         │
+│  - dev-data-processor                                       │
+│  - staging-data-processor                                   │
+│  - prod-data-processor                                      │
 └─────────────────────────────────────────────────────────────┘
 ```
 

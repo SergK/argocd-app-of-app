@@ -126,19 +126,19 @@ kubectl get applications -n argocd | grep my-app
 ```
 
 You should see:
-- `my-app-dev`
-- `my-app-staging`
-- `my-app-prod`
+- `dev-my-app`
+- `staging-my-app`
+- `prod-my-app`
 
 ### Step 7: Monitor Sync Status
 
 ```bash
 # Watch application sync status
-kubectl get application my-app-dev -n argocd -w
+kubectl get application dev-my-app -n argocd -w
 
 # Or use ArgoCD CLI
-argocd app get my-app-dev
-argocd app sync my-app-dev
+argocd app get dev-my-app
+argocd app sync dev-my-app
 ```
 
 ## Onboarding a New Cluster
@@ -351,7 +351,7 @@ git log -- codebases/my-app/values/dev.yaml
 yamllint codebases/my-app/values/dev.yaml
 
 # Check Application manifest
-kubectl get application my-app-dev -n argocd -o yaml
+kubectl get application dev-my-app -n argocd -o yaml
 ```
 
 ### Multiple Sources Error

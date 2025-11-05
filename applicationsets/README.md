@@ -70,7 +70,7 @@ generators:
 This creates a cross-product:
 - For cluster `dev`
 - And codebases: `frontend-app`, `backend-api`, `data-processor`
-- Generates: `frontend-app-dev`, `backend-api-dev`, `data-processor-dev`
+- Generates: `dev-frontend-app`, `dev-backend-api`, `dev-data-processor`
 
 ### Application Template
 
@@ -219,7 +219,7 @@ kubectl patch applicationset dev-apps -n argocd \
   --type merge -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"now"}}}'
 
 # Force Application sync
-argocd app sync frontend-app-dev
+argocd app sync dev-frontend-app
 ```
 
 ### Template Rendering Errors
