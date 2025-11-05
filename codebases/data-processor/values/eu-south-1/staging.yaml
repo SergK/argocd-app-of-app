@@ -1,0 +1,32 @@
+# Values overrides for data-processor in staging cluster
+
+image:
+  tag: "v3.0.5"
+  pullPolicy: IfNotPresent
+
+# CronJob schedule (runs every 30 minutes in staging)
+schedule: "*/30 * * * *"
+
+job:
+  backoffLimit: 3
+  restartPolicy: OnFailure
+
+resources:
+  limits:
+    cpu: 4000m
+    memory: 4Gi
+  requests:
+    cpu: 1000m
+    memory: 1Gi
+
+env:
+  - name: ENVIRONMENT
+    value: "staging"
+  - name: DATA_SOURCE
+    value: "s3://staging-bucket/data"
+  - name: LOG_LEVEL
+    value: "info"
+  - name: BATCH_SIZE
+    value: "500"
+
+concurrencyPolicy: Forbid

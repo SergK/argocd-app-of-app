@@ -1,0 +1,34 @@
+# Values overrides for data-processor in dev cluster
+
+image:
+  tag: "dev-latest"
+  pullPolicy: Always
+
+# CronJob schedule (runs every hour in dev)
+schedule: "0 * * * *"
+
+# Job configuration
+job:
+  backoffLimit: 3
+  restartPolicy: OnFailure
+
+resources:
+  limits:
+    cpu: 2000m
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+env:
+  - name: ENVIRONMENT
+    value: "development"
+  - name: DATA_SOURCE
+    value: "s3://dev-bucket/data"
+  - name: LOG_LEVEL
+    value: "debug"
+  - name: BATCH_SIZE
+    value: "100"
+
+# Concurrency policy for CronJob
+concurrencyPolicy: Forbid
