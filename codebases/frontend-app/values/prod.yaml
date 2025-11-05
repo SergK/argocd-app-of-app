@@ -1,0 +1,40 @@
+# Values overrides for frontend-app in prod cluster
+
+image:
+  tag: "v1.2.3"
+  pullPolicy: IfNotPresent
+
+replicaCount: 3
+
+resources:
+  limits:
+    cpu: 2000m
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+ingress:
+  enabled: true
+  host: frontend.example.com
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+
+env:
+  - name: ENVIRONMENT
+    value: "production"
+  - name: API_URL
+    value: "https://api.example.com"
+  - name: LOG_LEVEL
+    value: "warn"
+
+features:
+  analytics: true
+  experimental: false
+
+# Production-specific autoscaling
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70

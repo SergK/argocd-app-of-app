@@ -1,0 +1,8 @@
+codebase:
+  name: backend-api
+  repoURL: https://github.com/myorg/backend-api
+  chartPath: deploy-templates
+  targetRevision: main
+  namespace: backend
+  description: "Backend REST API service"
+  team: "backend-team"

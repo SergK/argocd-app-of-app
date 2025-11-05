@@ -1,0 +1,81 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: '{{.Values.clusterName}}-applications'
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+
+  generators:
+    # Matrix generator combines cluster config with all codebases
+    - matrix:
+        generators:
+          # First generator: Read cluster configuration
+          - git:
+              repoURL: '{{.Values.repoURL}}'
+              revision: '{{.Values.revision}}'
+              files:
+                - path: 'clusters/{{.Values.clusterName}}/config.yaml'
+
+          # Second generator: Scan all codebase directories
+          - git:
+              repoURL: '{{.Values.repoURL}}'
+              revision: '{{.Values.revision}}'
+              files:
+                - path: 'codebases/*/codebase.yaml'
+
+  template:
+    metadata:
+      # Application name: <codebase>-<cluster>
+      name: '{{.codebase.name}}-{{.cluster.name}}'
+      labels:
+        codebase: '{{.codebase.name}}'
+        cluster: '{{.cluster.name}}'
+        environment: '{{.cluster.environment}}'
+      # Finalizers ensure proper cleanup
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: default
+
+      sources:
+        # Source 1: Remote Helm chart from codebase repository
+        - repoURL: '{{.codebase.repoURL}}'
+          targetRevision: '{{default "main" .codebase.targetRevision}}'
+          path: '{{.codebase.chartPath}}'
+          helm:
+            valueFiles:
+              - values.yaml  # Default values from the remote chart
+              # Reference values from this repository (second source)
+              - $values/codebases/{{.codebase.name}}/values/{{.cluster.name}}.yaml
+
+        # Source 2: Values overrides from this repository
+        - repoURL: '{{.Values.repoURL}}'
+          targetRevision: '{{.Values.revision}}'
+          ref: values
+
+      destination:
+        server: '{{.cluster.server}}'
+        namespace: '{{default .codebase.name .codebase.namespace}}'
+
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m
+
+      # Health checks
+      ignoreDifferences:
+        - group: apps
+          kind: Deployment
+          jsonPointers:
+            - /spec/replicas

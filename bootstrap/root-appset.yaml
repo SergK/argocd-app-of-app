@@ -1,0 +1,56 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: root-apps-of-apps
+  namespace: argocd
+spec:
+  # GoTemplate enables advanced templating features
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+
+  generators:
+    # Git directory generator - scans clusters/ directory
+    - git:
+        repoURL: https://github.com/YourOrg/argocd-app-of-app.git
+        revision: main
+        directories:
+          - path: clusters/*
+
+  template:
+    metadata:
+      name: '{{.path.basename}}-apps'
+      # Add labels for organization
+      labels:
+        cluster: '{{.path.basename}}'
+        app-type: cluster-appset
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/YourOrg/argocd-app-of-app.git
+        targetRevision: main
+        path: applicationsets
+        directory:
+          # Only include the cluster-apps.yaml ApplicationSet
+          include: 'cluster-apps.yaml'
+          # Process as plain Kubernetes manifests
+          recurse: false
+        # Use Helm to pass cluster name as a parameter
+        helm:
+          # Pass the cluster name to the ApplicationSet template
+          parameters:
+            - name: clusterName
+              value: '{{.path.basename}}'
+            - name: repoURL
+              value: https://github.com/YourOrg/argocd-app-of-app.git
+            - name: revision
+              value: main
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

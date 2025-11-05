@@ -1,0 +1,29 @@
+# Values overrides for backend-api in staging cluster
+
+image:
+  tag: "v2.1.0"
+  pullPolicy: IfNotPresent
+
+replicaCount: 2
+
+resources:
+  limits:
+    cpu: 2000m
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+env:
+  - name: ENVIRONMENT
+    value: "staging"
+  - name: DATABASE_HOST
+    value: "postgres-staging.default.svc.cluster.local"
+  - name: LOG_LEVEL
+    value: "info"
+  - name: ENABLE_SWAGGER
+    value: "true"
+
+service:
+  type: ClusterIP
+  port: 8080

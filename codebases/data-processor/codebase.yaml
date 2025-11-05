@@ -1,0 +1,8 @@
+codebase:
+  name: data-processor
+  repoURL: https://github.com/myorg/data-processor
+  chartPath: deploy-templates
+  targetRevision: main
+  namespace: data-processing
+  description: "Data processing batch jobs"
+  team: "data-team"

@@ -1,0 +1,8 @@
+cluster:
+  name: prod
+  # The server URL for the Kubernetes cluster
+  server: https://prod-k8s.example.com
+  # Default namespace where ArgoCD manages resources
+  namespace: argocd
+  # Optional: Environment label for filtering
+  environment: production
