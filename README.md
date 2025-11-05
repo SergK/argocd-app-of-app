@@ -1,16 +1,27 @@
 # ArgoCD Apps-of-Apps Repository
 
-This repository implements an apps-of-apps pattern using ArgoCD ApplicationSet to automate the deployment of applications across multiple clusters and regions.
+This repository implements a **cluster-oriented deployment** pattern using ArgoCD ApplicationSet to automate the deployment of applications across multiple clusters and regions.
 
 ## Overview
 
-This GitOps repository manages deployments across **two AWS regions** (eu-central-1 and eu-south-1) with independent ArgoCD instances:
+This GitOps repository manages deployments across **two AWS regions** (eu-central-1 and eu-south-1) with independent ArgoCD instances, featuring:
 
-- **Multi-region support** with independent ArgoCD instances per region
-- **Automatically generating ArgoCD Applications** based on codebase and cluster combinations
-- **Deploying from remote Helm charts** located in application repositories
-- **Regional and cluster-specific value overrides** from this repository
-- **Enabling self-service onboarding** for new applications, clusters, and regions
+- **Selective deployment** - deploy codebases to specific clusters only (no forced all-or-nothing deployments)
+- **Progressive rollout** - add deployment markers when ready to promote to higher environments
+- **Multi-region support** - independent ArgoCD instances per region
+- **File-based deployment control** - creating a file enables deployment
+- **Per-cluster version control** - different Helm chart versions per cluster
+- **Remote Helm charts** - deploy from application repositories
+- **Values overrides** - region and environment-specific configurations
+
+## Key Concept
+
+**Creating a file enables deployment**. When you create a deployment marker file at `deployments/{region}/{cluster}/{codebase}.yaml`, ArgoCD will automatically:
+
+1. Detect the new deployment marker
+2. Load the codebase configuration
+3. Create an Application
+4. Deploy to the specified cluster
 
 ## Quick Start
 
@@ -39,13 +50,14 @@ kubectl apply -f bootstrap/eu-south-1.yaml -n argocd
 ```
 
 Each bootstrap will:
-- Scan its region's clusters in `regions/{region}/clusters/`
+- Scan deployment directories in `deployments/{region}/`
 - Create one ApplicationSet per cluster
-- Each cluster ApplicationSet will scan `codebases/` and create Applications
+- Each ApplicationSet scans deployment markers for that cluster
+- Applications are created only where deployment markers exist
 
 ### 2. Verify Deployment
 
-Check that ApplicationSets are created:
+Check that cluster-level ApplicationSets are created:
 
 ```bash
 kubectl get applicationsets -n argocd
@@ -70,322 +82,336 @@ You should see Applications like:
 - `euc1-staging-frontend-app`
 - `euc1-prod-frontend-app`
 - `euc1-dev-backend-api`
-- etc.
 
 ## Repository Structure
 
 ```text
-├── bootstrap/                    # Entry point - apply region-specific bootstrap
-│   ├── eu-central-1.yaml        # Bootstrap for Frankfurt ArgoCD
-│   ├── eu-south-1.yaml          # Bootstrap for Milan ArgoCD
-│   └── README.md
+├── bootstrap/                              # Entry point - region-specific bootstraps
+│   ├── eu-central-1.yaml                   # Bootstrap for Frankfurt ArgoCD
+│   ├── eu-south-1.yaml                     # Bootstrap for Milan ArgoCD
+│   └── README.md                           # Bootstrap documentation
 │
-├── regions/                      # Regional cluster definitions
+├── deployments/                            # Deployment markers (file existence = deployment enabled)
 │   ├── eu-central-1/
-│   │   └── clusters/
-│   │       ├── dev/
-│   │       ├── staging/
-│   │       └── prod/
+│   │   ├── euc1-dev/                       # Development cluster deployments
+│   │   │   ├── frontend-app.yaml
+│   │   │   ├── backend-api.yaml
+│   │   │   └── data-processor.yaml
+│   │   ├── euc1-staging/                   # Staging cluster deployments
+│   │   │   ├── frontend-app.yaml
+│   │   │   └── backend-api.yaml
+│   │   └── euc1-prod/                      # Production cluster deployments
+│   │       └── frontend-app.yaml
 │   └── eu-south-1/
-│       └── clusters/
-│           ├── dev/
-│           ├── staging/
-│           └── prod/
+│       └── eus1-dev/
+│           ├── backend-api.yaml
+│           └── data-processor.yaml
 │
-├── codebases/                    # Application configurations (shared across regions)
+├── codebases/                              # Application configurations (shared across regions)
 │   ├── frontend-app/
-│   │   ├── codebase.yaml        # Metadata (repo URL, chart path)
-│   │   └── values/              # Region and cluster-specific overrides
+│   │   ├── codebase.yaml                   # Metadata + version matrix
+│   │   └── values/                         # Region and environment-specific overrides
 │   │       ├── eu-central-1/
-│   │       │   ├── dev.yaml
+│   │       │   ├── development.yaml
 │   │       │   ├── staging.yaml
-│   │       │   └── prod.yaml
+│   │       │   └── production.yaml
 │   │       └── eu-south-1/
-│   │           ├── dev.yaml
+│   │           ├── development.yaml
 │   │           ├── staging.yaml
-│   │           └── prod.yaml
+│   │           └── production.yaml
 │   ├── backend-api/
 │   └── data-processor/
 │
-├── applicationsets/              # ApplicationSet templates
-│   └── cluster-apps.yaml        # Generates Applications (used by both regions)
+├── applicationsets/
+│   └── cluster-apps.yaml                   # ApplicationSet template (used by bootstrap)
 │
-└── docs/                         # Documentation
-    ├── architecture.md
-    ├── onboarding.md
-    └── multi-region-design.md
+└── docs/
+    ├── cluster-oriented-deployment-design.md  # Complete architecture documentation
+    └── onboarding.md                        # Onboarding guide
+
 ```
 
 ## How It Works
 
-### Application Generation Flow
+### Bootstrap Flow
 
-```text
-Region-Specific Bootstrap (per ArgoCD instance)
-    ↓ (scans regions/{region}/clusters/)
-Per-Cluster ApplicationSets
-    ↓ (scans codebases/)
-Applications (codebase × cluster matrix)
+```
+Bootstrap ApplicationSet (per region)
+    ↓ (scans deployments/{region}/ directories)
+Cluster ApplicationSets (one per cluster)
+    ↓ (scans deployments/{region}/{cluster}/*.yaml)
+Applications (one per deployment marker + codebase combination)
+    ↓ (deploys to target cluster)
+Kubernetes Resources
 ```
 
-**Example for eu-central-1:**
-- Bootstrap scans `regions/eu-central-1/clusters/*`
-- Creates: `euc1-dev-apps`, `euc1-staging-apps`, `euc1-prod-apps`
-- Each scans all codebases and creates Applications
+### Example: Deploying New Application
 
-### Multi-Region Architecture
-
-This repository supports **two independent ArgoCD instances**:
-
-| Region | ArgoCD Location | Manages Clusters | Application Prefix |
-|--------|----------------|------------------|-------------------|
-| eu-central-1 | Frankfurt | euc1-dev, euc1-staging, euc1-prod | euc1-* |
-| eu-south-1 | Milan | eus1-dev, eus1-staging, eus1-prod | eus1-* |
-
-**Key Features:**
-- Each ArgoCD operates independently
-- Shared codebase definitions (no duplication)
-- Regional values: `codebases/*/values/{region}/{environment}.yaml`
-- Regional isolation for disaster recovery
-
-### Example Generated Application
-
-For codebase `frontend-app` in `eu-central-1` region, `dev` environment:
-
-```yaml
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: euc1-dev-frontend-app
-  labels:
-    codebase: frontend-app
-    cluster: euc1-dev
-    region: eu-central-1
-    environment: development
-spec:
-  sources:
-    # Source 1: Remote Helm chart
-    - repoURL: https://github.com/myorg/frontend-app
-      path: deploy-templates
-      helm:
-        # Use short name for Helm release (not the full Application name)
-        releaseName: frontend-app
-        valueFiles:
-          - values.yaml  # From remote chart
-          - $values/codebases/frontend-app/values/eu-central-1/development.yaml
-
-    # Source 2: Local values overrides
-    - repoURL: https://github.com/YourOrg/argocd-app-of-app.git
-      ref: values
-
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: frontend
-```
-
-### Naming Conventions
-
-**Application Names**: Applications are named using the format `<cluster>-<codebase>` where cluster includes region prefix:
-- Format: `{region-prefix}-{environment}-{codebase}`
-- Examples: `euc1-dev-frontend-app`, `eus1-prod-backend-api`
-- Benefits: Easy grouping by cluster, unique across all ArgoCD instances
-
-**Cluster Names**: Clusters are prefixed with region identifier:
-- eu-central-1: `euc1-dev`, `euc1-staging`, `euc1-prod`
-- eu-south-1: `eus1-dev`, `eus1-staging`, `eus1-prod`
-
-**Helm Release Names**: The Helm `releaseName` is set to just the codebase name (e.g., `frontend-app`). This keeps Helm release names clean and consistent across all clusters and regions, avoiding long names like `euc1-dev-frontend-app`.
-
-Benefits:
-
-- Consistent Helm release names across environments
-- Easier to reference in Helm commands: `helm list -n frontend` shows `frontend-app` in all clusters
-- Resource names remain the same regardless of cluster (e.g., Deployment is always `frontend-app`, not `dev-frontend-app`)
-
-## Adding a New Application (Codebase)
-
-1. Create a directory under `codebases/`:
+**Step 1: Define the codebase** (once)
 
 ```bash
-mkdir -p codebases/my-new-app/values/{eu-central-1,eu-south-1}
-```
-
-2. Create `codebase.yaml`:
-
-```yaml
+# Create codebase configuration
+cat > codebases/payment-service/codebase.yaml <<EOF
 codebase:
-  name: my-new-app
-  repoURL: https://github.com/myorg/my-new-app
+  name: payment-service
+  repoURL: https://github.com/myorg/payment-service
   chartPath: deploy-templates
-  targetRevision: main
-  namespace: my-app
+  namespace: backend
+
+  # Version matrix: define versions for all regions and environments
+  targetRevisions:
+    eu-central-1:
+      development: main
+      staging: v1.0.0
+      production: v1.0.0
+    eu-south-1:
+      development: main
+      staging: v1.0.0
+      production: v1.0.0
+EOF
+
+# Create environment-specific values
+mkdir -p codebases/payment-service/values/eu-central-1
+cat > codebases/payment-service/values/eu-central-1/development.yaml <<EOF
+replicaCount: 1
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+EOF
 ```
 
-3. Create values overrides for **each region and environment**:
+**At this point**: No Applications are created. The codebase is defined but not deployed anywhere.
+
+**Step 2: Deploy to development**
 
 ```bash
-# Create values files for eu-central-1
-touch codebases/my-new-app/values/eu-central-1/development.yaml
-touch codebases/my-new-app/values/eu-central-1/staging.yaml
-touch codebases/my-new-app/values/eu-central-1/production.yaml
+# Enable deployment by creating marker file
+mkdir -p deployments/eu-central-1/euc1-dev
 
-# Create values files for eu-south-1
-touch codebases/my-new-app/values/eu-south-1/development.yaml
-touch codebases/my-new-app/values/eu-south-1/staging.yaml
-touch codebases/my-new-app/values/eu-south-1/production.yaml
-```
+cat > deployments/eu-central-1/euc1-dev/payment-service.yaml <<EOF
+cluster:
+  server: https://kubernetes.default.svc
+  namespace: argocd
+  environment: development
 
-4. Add your overrides (see examples in existing codebases)
+deployment: {}
+EOF
 
-5. Commit and push:
-
-```bash
-git add codebases/my-new-app/
-git commit -m "Add my-new-app codebase"
+git add deployments/eu-central-1/euc1-dev/payment-service.yaml
+git commit -m "Deploy payment-service to euc1-dev"
 git push
 ```
 
-Both ArgoCD instances will automatically detect the changes and create Applications for all clusters in their respective regions!
+**Result**: Application `euc1-dev-payment-service` is created and deploys from `main` branch.
 
-## Adding a New Cluster to a Region
-
-To add a new cluster (e.g., `qa`) to eu-central-1:
-
-1. Create a directory under the region:
+**Step 3: Promote to staging** (after testing)
 
 ```bash
-mkdir -p regions/eu-central-1/clusters/qa
+# Enable staging deployment
+cat > deployments/eu-central-1/euc1-staging/payment-service.yaml <<EOF
+cluster:
+  server: https://euc1-staging-k8s.example.com
+  namespace: argocd
+  environment: staging
+
+deployment: {}
+EOF
+
+git add deployments/eu-central-1/euc1-staging/payment-service.yaml
+git commit -m "Promote payment-service to euc1-staging"
+git push
 ```
 
-2. Create `config.yaml` with region-prefixed name:
+**Result**: Application `euc1-staging-payment-service` is created and deploys from `v1.0.0` tag.
+
+**Step 4: Promote to production** (after successful staging tests)
+
+```bash
+# Enable production deployment
+cat > deployments/eu-central-1/euc1-prod/payment-service.yaml <<EOF
+cluster:
+  server: https://euc1-prod-k8s.example.com
+  namespace: argocd
+  environment: production
+
+deployment: {}
+EOF
+
+git add deployments/eu-central-1/euc1-prod/payment-service.yaml
+git commit -m "Promote payment-service to production"
+git push
+```
+
+## Common Operations
+
+### Add New Codebase
+
+1. Create `codebases/{codebase}/codebase.yaml` with version matrix
+2. Create values files: `codebases/{codebase}/values/{region}/{environment}.yaml`
+3. No Applications are created yet (intentional - you control when to deploy)
+
+### Deploy to Cluster
+
+Create deployment marker file:
+
+```bash
+cat > deployments/eu-central-1/euc1-dev/my-app.yaml <<EOF
+cluster:
+  server: https://kubernetes.default.svc
+  namespace: argocd
+  environment: development
+
+deployment: {}
+EOF
+```
+
+### Emergency Hotfix
+
+Override version for specific cluster:
+
+```bash
+cat > deployments/eu-central-1/euc1-prod/frontend-app.yaml <<EOF
+cluster:
+  server: https://euc1-prod-k8s.example.com
+  namespace: argocd
+  environment: production
+
+deployment:
+  # Override to deploy hotfix branch
+  targetRevision: hotfix/security-patch-v1.2.1
+EOF
+```
+
+### Disable Deployment
+
+Remove the deployment marker file:
+
+```bash
+git rm deployments/eu-central-1/euc1-staging/old-service.yaml
+git commit -m "Disable old-service in staging"
+git push
+```
+
+### Add New Cluster
+
+1. Create deployment directory: `deployments/{region}/{cluster}/`
+2. Create deployment markers for applications you want to deploy
+3. Bootstrap will automatically detect the new cluster directory
+
+Example:
+
+```bash
+# Create QA cluster directory
+mkdir -p deployments/eu-central-1/euc1-qa
+
+# Deploy selected applications to QA
+cat > deployments/eu-central-1/euc1-qa/frontend-app.yaml <<EOF
+cluster:
+  server: https://euc1-qa-k8s.example.com
+  namespace: argocd
+  environment: qa
+
+deployment: {}
+EOF
+
+git add deployments/eu-central-1/euc1-qa
+git commit -m "Add QA cluster with frontend-app"
+git push
+```
+
+## Version Resolution
+
+The `targetRevision` (Helm chart version/Git ref) is resolved with this priority:
+
+1. **Deployment Override** (highest priority)
+   - `deployment.targetRevision` in deployment marker file
+   - Use for emergency hotfixes or feature branch testing
+
+2. **Codebase Matrix** (default)
+   - `codebase.targetRevisions[region][environment]` from `codebase.yaml`
+   - Standard version control per region and environment
+
+Example:
 
 ```yaml
-cluster:
-  # Cluster name with region prefix
-  name: euc1-qa
-  # AWS region
-  region: eu-central-1
-  # Environment type
-  environment: qa
-  # Kubernetes API server URL
-  server: https://qa-k8s.euc1.example.com
-  namespace: argocd
+# codebases/frontend-app/codebase.yaml
+targetRevisions:
+  eu-central-1:
+    development: main
+    staging: v1.3.0
+    production: v1.2.0
 ```
 
-3. Add corresponding values files for each codebase:
+If no override exists in the deployment marker file:
+- `euc1-dev` deploys from `main`
+- `euc1-staging` deploys from `v1.3.0`
+- `euc1-prod` deploys from `v1.2.0`
 
-```bash
-touch codebases/frontend-app/values/eu-central-1/qa.yaml
-touch codebases/backend-api/values/eu-central-1/qa.yaml
-touch codebases/data-processor/values/eu-central-1/qa.yaml
-```
+## Benefits
 
-4. Commit and push:
+✅ **No forced deployments** - codebases can be defined without deploying to all clusters
 
-```bash
-git add regions/eu-central-1/clusters/qa codebases/*/values/eu-central-1/qa.yaml
-git commit -m "Add QA cluster to eu-central-1"
-git push
-```
+✅ **Progressive rollout** - deploy to dev first, then staging, then production when ready
 
-The eu-central-1 ArgoCD will automatically create a new ApplicationSet (`euc1-qa-apps`) and deploy all codebases!
+✅ **Independent cluster/codebase addition** - add either without affecting the other
 
-## Configuration
+✅ **File-based deployment control** - intuitive GitOps workflow
 
-### Updating the Repository URL
+✅ **Emergency hotfix support** - override version for specific cluster only
 
-Before deploying, update the repository URL in:
+✅ **Clear audit trail** - Git history shows when each deployment was enabled/disabled
 
-- `bootstrap/root-appset.yaml` - Change `repoURL` to your repository
-- Update the example URLs in this README
+✅ **Multi-region support** - each region has independent deployment decisions
 
-### Cluster Server URLs
+✅ **Native ArgoCD** - uses only Matrix Generator and Git Generators, no custom plugins
 
-Update cluster server URLs in `clusters/*/config.yaml` to match your actual Kubernetes clusters.
+## Documentation
 
-### Sync Policies
-
-All ApplicationSets are configured with automated sync:
-
-- `prune: true` - Remove resources when removed from Git
-- `selfHeal: true` - Auto-sync when resources drift
-
-Modify `applicationsets/cluster-apps.yaml` to change sync behavior.
+- **[Complete Architecture Design](docs/cluster-oriented-deployment-design.md)** - In-depth design document with workflows, examples, and best practices
+- **[Deployment Markers Guide](deployments/README.md)** - Quick reference for deployment marker files
+- **[Bootstrap Guide](bootstrap/README.md)** - How bootstrap ApplicationSets work
+- **[Onboarding Guide](docs/onboarding.md)** - How to onboard new applications and clusters
 
 ## Troubleshooting
 
-### ApplicationSet Not Creating Applications
+### Application Not Created
 
-Check ApplicationSet status:
+- Verify file path: `deployments/{region}/{cluster}/{codebase}.yaml`
+- Confirm codebase exists: `codebases/{codebase}/codebase.yaml`
+- Check ArgoCD ApplicationSet controller logs
 
-```bash
-kubectl describe applicationset <name> -n argocd
-```
+### Wrong Version Deployed
 
-### Application Not Syncing
+- Check for `targetRevision` override in deployment marker file
+- Verify `environment` in deployment marker matches environment name
+- Confirm `targetRevisions` matrix in codebase.yaml has entry for this region+environment
 
-Check Application status:
+### Sync Failures
 
-```bash
-kubectl get application <name> -n argocd
-argocd app get <name>
-```
+- Verify `cluster.server` URL is correct and reachable
+- Check namespace exists or CreateNamespace is enabled
+- Confirm values file exists: `codebases/{codebase}/values/{region}/{environment}.yaml`
 
-### Values Override Not Applied
+## Migration from Previous Architecture
 
-Ensure:
+If you're migrating from the regions-based architecture:
 
-1. Values file exists at `codebases/<codebase>/values/<cluster>.yaml`
-2. File is committed to Git
-3. ArgoCD has synced the ApplicationSet
+1. Bootstrap files now scan `deployments/{region}/` instead of `regions/{region}/clusters/`
+2. Create deployment marker files for currently deployed applications
+3. Cluster configuration is now embedded in deployment marker files
+4. The `regions/` directory is no longer used and can be removed
 
-## Advanced Topics
+## Contributing
 
-### Using Secrets
+When adding new deployments:
 
-For sensitive values:
+1. **Test in dev first** - always create deployment marker in dev environment first
+2. **Progressive rollout** - follow dev → staging → production progression
+3. **Descriptive commit messages** - clearly describe what you're deploying and why
+4. **PR reviews** - require reviews for production deployment marker changes
+5. **Remove overrides** - when hotfix is merged and tagged, remove `targetRevision` override
 
-- Use ArgoCD Vault Plugin
-- Use External Secrets Operator
-- Use Sealed Secrets
-- Reference secrets from values files
+## License
 
-Example in values override:
-
-```yaml
-env:
-  - name: DB_PASSWORD
-    valueFrom:
-      secretKeyRef:
-        name: db-credentials
-        key: password
-```
-
-### Multiple Sources
-
-The ApplicationSet uses multiple sources:
-
-- Remote Helm chart (primary)
-- Local values repository (overrides)
-
-This allows keeping deployment templates in application repos while centralizing environment-specific configs.
-
-### Filtering Deployments
-
-To deploy only certain codebases to certain clusters, modify the ApplicationSet generators to add filters based on labels or annotations.
-
-## Resources
-
-- [ArgoCD Documentation](https://argo-cd.readthedocs.io/)
-- [ApplicationSet Documentation](https://argo-cd.readthedocs.io/en/latest/operator-manual/applicationset/)
-- [Akuity GitOps Workshops](https://docs.akuity.io/tutorials/)
-- [Design Documentation](./DESIGN.md)
-- [Onboarding Guide](./docs/onboarding.md)
-
-## Support
-
-For issues or questions:
-
-1. Check the [troubleshooting section](#troubleshooting)
-2. Review the [documentation](./docs/)
-3. Open an issue in this repository
+[Your License]

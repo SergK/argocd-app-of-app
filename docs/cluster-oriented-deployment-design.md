@@ -304,21 +304,11 @@ git push
 ### Example 4: Add New Cluster
 
 ```bash
-# Step 1: Define cluster configuration
-mkdir -p regions/eu-central-1/clusters/qa
-cat > regions/eu-central-1/clusters/qa/config.yaml <<EOF
-cluster:
-  name: euc1-qa
-  region: eu-central-1
-  environment: qa
-  server: https://euc1-qa-k8s.example.com
-  namespace: argocd
-EOF
-
-# Step 2: Update targetRevisions in codebases that should deploy to QA
+# Step 1: Update targetRevisions in codebases that should deploy to QA
 # Edit codebases/*/codebase.yaml to add qa: version under eu-central-1
+# Example: add "qa: v1.0.0" under targetRevisions.eu-central-1
 
-# Step 3: Enable deployments for selected codebases
+# Step 2: Enable deployments for selected codebases
 mkdir -p deployments/eu-central-1/euc1-qa
 
 cat > deployments/eu-central-1/euc1-qa/frontend-app.yaml <<EOF
