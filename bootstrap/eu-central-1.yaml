@@ -12,12 +12,13 @@ spec:
   goTemplateOptions: ["missingkey=error"]
 
   generators:
-    # Git directory generator - scans eu-central-1 clusters
+    # Git directory generator - scans eu-central-1 deployment directories
+    # Each directory under deployments/eu-central-1/ represents a cluster
     - git:
         repoURL: https://github.com/YourOrg/argocd-app-of-app.git
         revision: main
         directories:
-          - path: regions/eu-central-1/clusters/*
+          - path: deployments/eu-central-1/*
 
   template:
     metadata:
