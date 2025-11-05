@@ -99,6 +99,8 @@ spec:
     - repoURL: https://github.com/myorg/frontend-app
       path: deploy-templates
       helm:
+        # Use short name for Helm release (not the full Application name)
+        releaseName: frontend-app
         valueFiles:
           - values.yaml  # From remote chart
           - $values/codebases/frontend-app/values/dev.yaml
@@ -111,6 +113,17 @@ spec:
     server: https://kubernetes.default.svc
     namespace: frontend
 ```
+
+### Naming Conventions
+
+**Application Names**: Applications are named using the format `<cluster>-<codebase>` (e.g., `dev-frontend-app`, `prod-backend-api`). This allows easy grouping and filtering by cluster.
+
+**Helm Release Names**: The Helm `releaseName` is set to just the codebase name (e.g., `frontend-app`). This keeps Helm release names clean and consistent across all clusters, avoiding long names like `dev-frontend-app`.
+
+Benefits:
+- Consistent Helm release names across environments
+- Easier to reference in Helm commands: `helm list -n frontend` shows `frontend-app` in all clusters
+- Resource names remain the same regardless of cluster (e.g., Deployment is always `frontend-app`, not `dev-frontend-app`)
 
 ## Adding a New Application (Codebase)
 

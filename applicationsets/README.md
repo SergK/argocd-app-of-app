@@ -78,7 +78,7 @@ Each generated Application has this structure:
 
 ```yaml
 metadata:
-  name: '{{.codebase.name}}-{{.cluster.name}}'
+  name: '{{.cluster.name}}-{{.codebase.name}}'
 
 spec:
   sources:
@@ -86,6 +86,8 @@ spec:
     - repoURL: '{{.codebase.repoURL}}'
       path: '{{.codebase.chartPath}}'
       helm:
+        # Use short codebase name for Helm release
+        releaseName: '{{.codebase.name}}'
         valueFiles:
           - values.yaml
           - $values/codebases/{{.codebase.name}}/values/{{.cluster.name}}.yaml
@@ -98,6 +100,8 @@ spec:
     server: '{{.cluster.server}}'
     namespace: '{{.codebase.namespace}}'
 ```
+
+**Important**: The `releaseName` is set to just the codebase name (e.g., `frontend-app`) rather than the full Application name (e.g., `dev-frontend-app`). This keeps Helm release names consistent across all clusters and prevents long resource names.
 
 ## Customization
 

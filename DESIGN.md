@@ -172,15 +172,21 @@ Applications use multiple values files:
 Example Application spec:
 ```yaml
 spec:
-  source:
-    repoURL: https://github.com/myorg/frontend-app
-    targetRevision: main
-    path: deploy-templates
-    helm:
-      valueFiles:
-      - values.yaml  # From remote chart
-      - https://raw.githubusercontent.com/myorg/argocd-app-of-app/main/codebases/frontend-app/values/dev.yaml
+  sources:
+    - repoURL: https://github.com/myorg/frontend-app
+      targetRevision: main
+      path: deploy-templates
+      helm:
+        # Use short codebase name for Helm release
+        releaseName: frontend-app
+        valueFiles:
+          - values.yaml  # From remote chart
+          - $values/codebases/frontend-app/values/dev.yaml
+    - repoURL: https://github.com/myorg/argocd-app-of-app
+      ref: values
 ```
+
+**Naming Convention**: Applications are named `<cluster>-<codebase>` (e.g., `dev-frontend-app`), but the Helm release name is set to just the codebase name (e.g., `frontend-app`) to keep resource names clean and consistent across clusters.
 
 ### Git-Based Automation
 
