@@ -1,0 +1,11 @@
+cluster:
+  # Cluster name with region prefix for uniqueness
+  name: eus1-prod
+  # AWS region where this cluster is deployed
+  region: eu-south-1
+  # Environment type
+  environment: production
+  # The server URL for the Kubernetes cluster
+  server: https://prod-k8s.eus1.example.com
+  # Default namespace where ArgoCD manages resources
+  namespace: argocd

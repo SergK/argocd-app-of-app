@@ -1,52 +1,62 @@
 # ArgoCD Apps-of-Apps Design
 
+> **Note**: This repository now supports multi-region deployment with independent ArgoCD instances. For detailed multi-region architecture, see [Multi-Region Design](docs/multi-region-design.md).
+
 ## Overview
 
-This repository implements an apps-of-apps pattern using ArgoCD ApplicationSet to manage deployments across multiple codebases and clusters. The design follows Akuity's GitOps best practices and enables:
+This repository implements an apps-of-apps pattern using ArgoCD ApplicationSet to manage deployments across multiple AWS regions, codebases, and clusters. The design follows Akuity's GitOps best practices and enables:
 
+- **Multi-region support** with independent ArgoCD instances per region (eu-central-1, eu-south-1)
 - Automated Application generation based on codebase and cluster combinations
 - Remote Helm chart references from codebase repositories
-- Local values overrides per codebase and cluster
+- Regional and cluster-specific values overrides
 - Self-service application onboarding
-- Centralized cluster and codebase management
+- Regional isolation for disaster recovery
 
 ## Repository Structure
 
-```
+```text
 argocd-app-of-app/
 ├── README.md                           # Repository overview and getting started
 ├── DESIGN.md                           # This design document
 │
-├── bootstrap/                          # Bootstrap ArgoCD with the root ApplicationSet
-│   └── root-appset.yaml               # Root ApplicationSet that creates cluster ApplicationSets
+├── bootstrap/                          # Region-specific bootstrap ApplicationSets
+│   ├── eu-central-1.yaml              # Bootstrap for Frankfurt ArgoCD
+│   ├── eu-south-1.yaml                # Bootstrap for Milan ArgoCD
+│   └── README.md
 │
-├── clusters/                           # Cluster-specific configurations
-│   ├── dev/
-│   │   └── config.yaml                # Cluster metadata (name, server URL, etc.)
-│   ├── staging/
-│   │   └── config.yaml
-│   └── prod/
-│       └── config.yaml
+├── regions/                            # Regional cluster configurations
+│   ├── eu-central-1/
+│   │   └── clusters/
+│   │       ├── dev/
+│   │       │   └── config.yaml
+│   │       ├── staging/
+│   │       │   └── config.yaml
+│   │       └── prod/
+│   │           └── config.yaml
+│   └── eu-south-1/
+│       └── clusters/
+│           ├── dev/
+│           │   └── config.yaml
+│           ├── staging/
+│           │   └── config.yaml
+│           └── prod/
+│               └── config.yaml
 │
-├── codebases/                          # Codebase definitions and configurations
+├── codebases/                          # Codebase definitions (shared across regions)
 │   ├── frontend-app/
 │   │   ├── codebase.yaml              # Codebase metadata (repo URL, chart path)
-│   │   └── values/                    # Values overrides per cluster
-│   │       ├── dev.yaml
-│   │       ├── staging.yaml
-│   │       └── prod.yaml
+│   │   └── values/                    # Regional and cluster-specific overrides
+│   │       ├── eu-central-1/
+│   │       │   ├── development.yaml
+│   │       │   ├── staging.yaml
+│   │       │   └── production.yaml
+│   │       └── eu-south-1/
+│   │           ├── development.yaml
+│   │           ├── staging.yaml
+│   │           └── production.yaml
 │   ├── backend-api/
-│   │   ├── codebase.yaml
-│   │   └── values/
-│   │       ├── dev.yaml
-│   │       ├── staging.yaml
-│   │       └── prod.yaml
 │   └── data-processor/
-│       ├── codebase.yaml
-│       └── values/
-│           ├── dev.yaml
-│           ├── staging.yaml
-│           └── prod.yaml
 │
 ├── applicationsets/                    # ApplicationSet definitions
 │   ├── cluster-apps.yaml              # Generates ApplicationSets per cluster
@@ -61,19 +71,26 @@ argocd-app-of-app/
 
 ### 1. Bootstrap Layer
 
-The `bootstrap/root-appset.yaml` is the entry point. This ApplicationSet:
-- Uses Git Directory generator to scan the `clusters/` directory
-- Creates one ApplicationSet per cluster
+Region-specific bootstrap ApplicationSets are the entry points:
+
+- **eu-central-1.yaml**: Scans `regions/eu-central-1/clusters/` directory
+- **eu-south-1.yaml**: Scans `regions/eu-south-1/clusters/` directory
+
+Each bootstrap:
+- Uses Git Directory generator to scan its region's clusters
+- Creates one ApplicationSet per cluster in that region
 - Each cluster ApplicationSet will scan codebases and create Applications
 
-### 2. Cluster Definitions
+### 2. Regional Cluster Definitions
 
-Each cluster has a configuration file at `clusters/<cluster-name>/config.yaml`:
+Each cluster has a configuration file at `regions/<region>/clusters/<cluster-name>/config.yaml`:
 
 ```yaml
-# clusters/dev/config.yaml
+# regions/eu-central-1/clusters/dev/config.yaml
 cluster:
-  name: dev
+  name: euc1-dev              # Region-prefixed for uniqueness
+  region: eu-central-1        # AWS region
+  environment: development    # Environment type
   server: https://kubernetes.default.svc
   namespace: argocd
 ```
@@ -81,8 +98,8 @@ cluster:
 ### 3. Codebase Definitions
 
 Each codebase has:
-- A `codebase.yaml` file with metadata
-- A `values/` directory with cluster-specific overrides
+- A `codebase.yaml` file with metadata (shared across regions)
+- A `values/` directory with regional and cluster-specific overrides
 
 Example `codebases/frontend-app/codebase.yaml`:
 
@@ -93,6 +110,19 @@ codebase:
   chartPath: deploy-templates
   targetRevision: main
   namespace: frontend
+```
+
+Values structure:
+```
+codebases/frontend-app/values/
+├── eu-central-1/
+│   ├── development.yaml
+│   ├── staging.yaml
+│   └── production.yaml
+└── eu-south-1/
+    ├── development.yaml
+    ├── staging.yaml
+    └── production.yaml
 ```
 
 ### 4. ApplicationSet Pattern
@@ -111,13 +141,14 @@ The design uses a layered ApplicationSet approach:
 ### 5. Values Override Strategy
 
 Values are organized hierarchically:
+
 - Remote Helm chart contains default values
 - `codebases/<codebase>/values/<cluster>.yaml` provides cluster-specific overrides
 - ArgoCD merges these using Helm's values precedence
 
 ## Application Generation Flow
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │  Bootstrap Root ApplicationSet                              │
 │  (bootstrap/root-appset.yaml)                              │
@@ -153,12 +184,14 @@ Values are organized hierarchically:
 ### Self-Service Onboarding
 
 To add a new codebase:
+
 1. Create directory under `codebases/<new-codebase>/`
 2. Add `codebase.yaml` with repository and chart information
 3. Add values overrides in `codebases/<new-codebase>/values/<cluster>.yaml`
 4. Commit and push - ApplicationSet automatically creates Applications
 
 To add a new cluster:
+
 1. Create directory under `clusters/<new-cluster>/`
 2. Add `config.yaml` with cluster information
 3. Commit and push - ApplicationSet automatically creates cluster ApplicationSet
@@ -166,25 +199,34 @@ To add a new cluster:
 ### Values Override Mechanism
 
 Applications use multiple values files:
+
 1. Default values from remote Helm chart
 2. Cluster-specific overrides from this repository
 
 Example Application spec:
+
 ```yaml
 spec:
-  source:
-    repoURL: https://github.com/myorg/frontend-app
-    targetRevision: main
-    path: deploy-templates
-    helm:
-      valueFiles:
-      - values.yaml  # From remote chart
-      - https://raw.githubusercontent.com/myorg/argocd-app-of-app/main/codebases/frontend-app/values/dev.yaml
+  sources:
+    - repoURL: https://github.com/myorg/frontend-app
+      targetRevision: main
+      path: deploy-templates
+      helm:
+        # Use short codebase name for Helm release
+        releaseName: frontend-app
+        valueFiles:
+          - values.yaml  # From remote chart
+          - $values/codebases/frontend-app/values/dev.yaml
+    - repoURL: https://github.com/myorg/argocd-app-of-app
+      ref: values
 ```
+
+**Naming Convention**: Applications are named `<cluster>-<codebase>` (e.g., `dev-frontend-app`), but the Helm release name is set to just the codebase name (e.g., `frontend-app`) to keep resource names clean and consistent across clusters.
 
 ### Git-Based Automation
 
 All changes are GitOps-driven:
+
 - Add/remove codebases by modifying `codebases/` directory
 - Add/remove clusters by modifying `clusters/` directory
 - Update values by modifying files in `codebases/*/values/*.yaml`
@@ -205,16 +247,19 @@ Based on Akuity workshops and ArgoCD best practices:
 ## Alternative Approaches
 
 ### Approach 1: Matrix Generator (Current Design)
+
 - Uses nested generators to create codebase × cluster matrix
 - Pros: Automatic combination of all codebases with all clusters
 - Cons: Less granular control over which codebase goes to which cluster
 
 ### Approach 2: Git File Generator
+
 - Uses a single config file listing all codebase-cluster pairs
 - Pros: Explicit control over deployments
 - Cons: Manual maintenance of combinations
 
 ### Approach 3: List Generator
+
 - Hardcoded list of codebases and clusters
 - Pros: Simple and explicit
 - Cons: Not GitOps-friendly, requires ApplicationSet changes

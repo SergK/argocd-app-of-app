@@ -1,0 +1,57 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: eu-central-1-root
+  namespace: argocd
+  labels:
+    region: eu-central-1
+spec:
+  # GoTemplate enables advanced templating features
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+
+  generators:
+    # Git directory generator - scans eu-central-1 clusters
+    - git:
+        repoURL: https://github.com/YourOrg/argocd-app-of-app.git
+        revision: main
+        directories:
+          - path: regions/eu-central-1/clusters/*
+
+  template:
+    metadata:
+      name: '{{.path.basename}}-apps'
+      labels:
+        cluster: '{{.path.basename}}'
+        region: eu-central-1
+        app-type: cluster-appset
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/YourOrg/argocd-app-of-app.git
+        targetRevision: main
+        path: applicationsets
+        directory:
+          include: 'cluster-apps.yaml'
+          recurse: false
+        # Use Helm to pass parameters to the ApplicationSet template
+        helm:
+          parameters:
+            - name: clusterName
+              value: '{{.path.basename}}'
+            - name: region
+              value: eu-central-1
+            - name: repoURL
+              value: https://github.com/YourOrg/argocd-app-of-app.git
+            - name: revision
+              value: main
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

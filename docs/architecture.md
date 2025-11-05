@@ -6,7 +6,7 @@ This document describes the architecture of the ArgoCD apps-of-apps system, whic
 
 ## Architecture Diagram
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         Git Repository                              │
 │                   (argocd-app-of-app)                              │
@@ -94,10 +94,12 @@ This document describes the architecture of the ArgoCD apps-of-apps system, whic
 The GitOps repository contains all configuration:
 
 #### clusters/
+
 Defines Kubernetes clusters where applications will be deployed.
 
 **Structure**:
-```
+
+```bash
 clusters/
 ├── dev/
 │   └── config.yaml
@@ -108,15 +110,18 @@ clusters/
 ```
 
 **Purpose**:
+
 - Store cluster metadata (name, server URL, namespace)
 - Enable cluster discovery via Git File generator
 - Allow easy addition of new clusters
 
 #### codebases/
+
 Defines applications and their configurations.
 
 **Structure**:
-```
+
+```bash
 codebases/
 ├── frontend-app/
 │   ├── codebase.yaml        # Metadata
@@ -129,34 +134,41 @@ codebases/
 ```
 
 **Purpose**:
+
 - Define application source repositories
 - Specify Helm chart location
 - Provide cluster-specific value overrides
 
 #### bootstrap/
+
 Entry point for the system.
 
 **Structure**:
-```
+
+```bash
 bootstrap/
 └── root-appset.yaml
 ```
 
 **Purpose**:
+
 - Bootstrap the entire apps-of-apps system
 - Create per-cluster ApplicationSets
 - Single file to apply to ArgoCD
 
 #### applicationsets/
+
 Templates for ApplicationSet resources.
 
 **Structure**:
-```
+
+```bash
 applicationsets/
 └── cluster-apps.yaml
 ```
 
 **Purpose**:
+
 - Template for generating Applications
 - Used by root ApplicationSet to create per-cluster instances
 - Contains the matrix logic (codebase × cluster)
@@ -168,14 +180,17 @@ applicationsets/
 **Location**: `bootstrap/root-appset.yaml`
 
 **Generators Used**:
+
 - Git Directory Generator
 
 **What It Does**:
+
 1. Scans `clusters/` directory
 2. For each cluster directory found, creates an ApplicationSet
 3. Passes cluster name as parameter to child ApplicationSets
 
 **Key Configuration**:
+
 ```yaml
 generators:
   - git:
@@ -190,17 +205,20 @@ generators:
 **Location**: Deployed by Root ApplicationSet from `applicationsets/cluster-apps.yaml`
 
 **Generators Used**:
+
 - Matrix Generator combining:
   - Git File Generator (cluster config)
   - Git File Generator (codebase configs)
 
 **What It Does**:
+
 1. Reads cluster configuration from `clusters/<cluster>/config.yaml`
 2. Scans all `codebases/*/codebase.yaml` files
 3. For each codebase, generates an Application targeting the cluster
 4. Configures Application with remote Helm chart + local values
 
 **Key Configuration**:
+
 ```yaml
 generators:
   - matrix:
@@ -220,11 +238,13 @@ Each Application represents a deployment of a codebase to a cluster.
 **Naming Convention**: `<cluster>-<codebase>` (e.g., `dev-frontend-app`)
 
 **Key Features**:
+
 - Multiple sources (ArgoCD 2.6+)
 - Automated sync with self-heal
 - Namespace auto-creation
 
 **Application Structure**:
+
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -236,6 +256,8 @@ spec:
     - repoURL: https://github.com/myorg/frontend-app
       path: deploy-templates
       helm:
+        # Use short name for Helm release (not full Application name)
+        releaseName: frontend-app
         valueFiles:
           - values.yaml  # From remote
           - $values/codebases/frontend-app/values/dev.yaml
@@ -249,14 +271,18 @@ spec:
     namespace: frontend
 ```
 
+**Note**: The Application name is `dev-frontend-app` (cluster-codebase format), but the Helm release name is set to just `frontend-app` to keep resource names clean and consistent across all clusters.
+
 ### 4. Application Repositories
 
 Each application has its own Git repository containing:
+
 - Application source code
 - Helm chart in `deploy-templates/` (or configured path)
 - Default `values.yaml`
 
 **Separation of Concerns**:
+
 - Application repos own the deployment templates
 - GitOps repo (this repo) owns environment-specific overrides
 
@@ -265,6 +291,7 @@ Each application has its own Git repository containing:
 ### Initial Bootstrap Flow
 
 1. **Administrator** applies `bootstrap/root-appset.yaml` to ArgoCD:
+
    ```bash
    kubectl apply -f bootstrap/root-appset.yaml -n argocd
    ```
@@ -285,6 +312,7 @@ Each application has its own Git repository containing:
 ### Adding a New Codebase Flow
 
 1. **Developer** creates `codebases/new-app/` with configuration:
+
    ```bash
    mkdir -p codebases/new-app/values
    # Create codebase.yaml and values files
@@ -307,11 +335,13 @@ Each application has its own Git repository containing:
 ### Adding a New Cluster Flow
 
 1. **Administrator** registers cluster with ArgoCD:
+
    ```bash
    argocd cluster add qa-cluster
    ```
 
 2. **Administrator** creates `clusters/qa/` with configuration:
+
    ```bash
    mkdir -p clusters/qa
    # Create config.yaml
@@ -332,48 +362,57 @@ Each application has its own Git repository containing:
 ### Why Apps-of-Apps Pattern?
 
 **Advantages**:
+
 - **Automation**: No manual Application creation
 - **Scalability**: Easy to add clusters/codebases
 - **Consistency**: Same pattern across all deployments
 - **Auditability**: All changes tracked in Git
 
 **Alternatives Considered**:
+
 - Manual Application creation: Not scalable
 - Single mega-ApplicationSet: Hard to manage, lacks flexibility
 
 ### Why Matrix Generator?
 
 **Advantages**:
+
 - Automatically combines codebases with clusters
 - Single source of truth for each dimension
 - DRY: No duplication of codebase or cluster definitions
 
 **Alternatives Considered**:
+
 - List generator: Requires manual listing of combinations
 - Separate ApplicationSets per codebase: Doesn't scale
 
 ### Why Multiple Sources?
 
 **Advantages**:
+
 - **Separation of Concerns**: App teams own templates, platform teams own configs
 - **Flexibility**: Different revision per environment possible
 - **Security**: Centralized sensitive configurations
 
 **Requirements**:
+
 - ArgoCD 2.6+
 
 **Alternatives Considered**:
+
 - Single source with all values: Centralization violates separation of concerns
 - Values in application repo: Environment-specific values scattered across repos
 
 ### Why Remote Helm Charts?
 
 **Advantages**:
+
 - Application teams control deployment templates
 - Version templates with application code
 - Update templates without touching GitOps repo
 
 **Alternatives Considered**:
+
 - Helm charts in GitOps repo: Creates coupling and duplication
 - Plain manifests: Less flexible than Helm
 
@@ -382,27 +421,32 @@ Each application has its own Git repository containing:
 ### Horizontal Scaling
 
 The design scales horizontally:
+
 - **Codebases**: Add unlimited codebases by adding directories
 - **Clusters**: Add unlimited clusters by adding directories
 - **Combinations**: N codebases × M clusters = N×M Applications
 
 **Example Scaling**:
+
 - 10 codebases × 5 clusters = 50 Applications
 - 100 codebases × 10 clusters = 1000 Applications
 
 ### Performance Considerations
 
 **Git Repository Size**:
+
 - Codebase configs are small (< 1 KB each)
 - Values files are small (typically < 10 KB each)
 - Expected: 1000 codebases = ~10 MB repository
 
 **ApplicationSet Processing**:
+
 - Each ApplicationSet runs its generators periodically
 - Git File generator is efficient (single clone, file scan)
 - Matrix generator multiplies combinations
 
 **ArgoCD Scalability**:
+
 - ArgoCD can handle thousands of Applications
 - Consider sharding ArgoCD for > 1000 Applications
 
@@ -411,15 +455,18 @@ The design scales horizontally:
 ### Access Control
 
 **Repository Access**:
+
 - Read access required for ArgoCD to GitOps repo
 - Read access required for ArgoCD to application repos
 - Write access for authorized users to commit changes
 
 **RBAC**:
+
 - Use ArgoCD Projects to limit Application permissions
 - Restrict which clusters/namespaces teams can deploy to
 
 **Secrets Management**:
+
 - Do NOT commit secrets to Git
 - Use External Secrets Operator, Sealed Secrets, or Vault
 - Reference secrets from values files
@@ -427,11 +474,13 @@ The design scales horizontally:
 ### Git Security
 
 **Branch Protection**:
+
 - Require pull requests for `main` branch
 - Require reviews for production changes
 - Use signed commits
 
 **Audit Trail**:
+
 - All changes tracked in Git history
 - Reviewable in pull requests
 
@@ -454,24 +503,28 @@ The design scales horizontally:
 ### Key Metrics
 
 **ApplicationSet Health**:
+
 ```bash
 kubectl get applicationset -n argocd
 kubectl describe applicationset <name> -n argocd
 ```
 
 **Application Sync Status**:
+
 ```bash
 kubectl get applications -n argocd
 argocd app list
 ```
 
 **Git Sync**:
+
 - Monitor ArgoCD logs for Git fetch failures
 - Alert on sync failures
 
 ### Alerts
 
 Recommended alerts:
+
 - Application sync failed
 - Application health degraded
 - ApplicationSet error
@@ -482,11 +535,13 @@ Recommended alerts:
 ### Backup
 
 **What to Backup**:
+
 - Git repository (primary source of truth)
 - ArgoCD configuration
 - Cluster registration secrets
 
 **Recovery Steps**:
+
 1. Restore Git repository
 2. Reinstall ArgoCD
 3. Register clusters
@@ -496,6 +551,7 @@ Recommended alerts:
 ### Git as DR
 
 Git history serves as:
+
 - Complete audit trail
 - Point-in-time recovery
 - Disaster recovery source
@@ -514,6 +570,7 @@ Git history serves as:
 ### Customization Points
 
 The design is extensible:
+
 - Add generators for different discovery methods
 - Filter generators with selectors
 - Modify templates for different Application specs
