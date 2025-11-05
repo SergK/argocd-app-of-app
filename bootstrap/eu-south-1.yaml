@@ -2,27 +2,29 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: root-apps-of-apps
+  name: eu-south-1-root
   namespace: argocd
+  labels:
+    region: eu-south-1
 spec:
   # GoTemplate enables advanced templating features
   goTemplate: true
   goTemplateOptions: ["missingkey=error"]
 
   generators:
-    # Git directory generator - scans clusters/ directory
+    # Git directory generator - scans eu-south-1 clusters
     - git:
         repoURL: https://github.com/YourOrg/argocd-app-of-app.git
         revision: main
         directories:
-          - path: clusters/*
+          - path: regions/eu-south-1/clusters/*
 
   template:
     metadata:
       name: '{{.path.basename}}-apps'
-      # Add labels for organization
       labels:
         cluster: '{{.path.basename}}'
+        region: eu-south-1
         app-type: cluster-appset
     spec:
       project: default
@@ -31,16 +33,15 @@ spec:
         targetRevision: main
         path: applicationsets
         directory:
-          # Only include the cluster-apps.yaml ApplicationSet
           include: 'cluster-apps.yaml'
-          # Process as plain Kubernetes manifests
           recurse: false
-        # Use Helm to pass cluster name as a parameter
+        # Use Helm to pass parameters to the ApplicationSet template
         helm:
-          # Pass the cluster name to the ApplicationSet template
           parameters:
             - name: clusterName
               value: '{{.path.basename}}'
+            - name: region
+              value: eu-south-1
             - name: repoURL
               value: https://github.com/YourOrg/argocd-app-of-app.git
             - name: revision

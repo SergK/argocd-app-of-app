@@ -12,12 +12,12 @@ spec:
     # Matrix generator combines cluster config with all codebases
     - matrix:
         generators:
-          # First generator: Read cluster configuration
+          # First generator: Read cluster configuration from region
           - git:
               repoURL: '{{.Values.repoURL}}'
               revision: '{{.Values.revision}}'
               files:
-                - path: 'clusters/{{.Values.clusterName}}/config.yaml'
+                - path: 'regions/{{.Values.region}}/clusters/{{.Values.clusterName}}/config.yaml'
 
           # Second generator: Scan all codebase directories
           - git:
@@ -33,6 +33,7 @@ spec:
       labels:
         codebase: '{{.codebase.name}}'
         cluster: '{{.cluster.name}}'
+        region: '{{.cluster.region}}'
         environment: '{{.cluster.environment}}'
       # Finalizers ensure proper cleanup
       finalizers:
@@ -52,7 +53,8 @@ spec:
             valueFiles:
               - values.yaml  # Default values from the remote chart
               # Reference values from this repository (second source)
-              - $values/codebases/{{.codebase.name}}/values/{{.cluster.name}}.yaml
+              # Path: codebases/{codebase}/values/{region}/{environment}.yaml
+              - $values/codebases/{{.codebase.name}}/values/{{.cluster.region}}/{{.cluster.environment}}.yaml
 
         # Source 2: Values overrides from this repository
         - repoURL: '{{.Values.repoURL}}'

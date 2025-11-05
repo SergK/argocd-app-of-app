@@ -1,52 +1,62 @@
 # ArgoCD Apps-of-Apps Design
 
+> **Note**: This repository now supports multi-region deployment with independent ArgoCD instances. For detailed multi-region architecture, see [Multi-Region Design](docs/multi-region-design.md).
+
 ## Overview
 
-This repository implements an apps-of-apps pattern using ArgoCD ApplicationSet to manage deployments across multiple codebases and clusters. The design follows Akuity's GitOps best practices and enables:
+This repository implements an apps-of-apps pattern using ArgoCD ApplicationSet to manage deployments across multiple AWS regions, codebases, and clusters. The design follows Akuity's GitOps best practices and enables:
 
+- **Multi-region support** with independent ArgoCD instances per region (eu-central-1, eu-south-1)
 - Automated Application generation based on codebase and cluster combinations
 - Remote Helm chart references from codebase repositories
-- Local values overrides per codebase and cluster
+- Regional and cluster-specific values overrides
 - Self-service application onboarding
-- Centralized cluster and codebase management
+- Regional isolation for disaster recovery
 
 ## Repository Structure
 
-```bash
+```text
 argocd-app-of-app/
 ├── README.md                           # Repository overview and getting started
 ├── DESIGN.md                           # This design document
 │
-├── bootstrap/                          # Bootstrap ArgoCD with the root ApplicationSet
-│   └── root-appset.yaml               # Root ApplicationSet that creates cluster ApplicationSets
+├── bootstrap/                          # Region-specific bootstrap ApplicationSets
+│   ├── eu-central-1.yaml              # Bootstrap for Frankfurt ArgoCD
+│   ├── eu-south-1.yaml                # Bootstrap for Milan ArgoCD
+│   └── README.md
 │
-├── clusters/                           # Cluster-specific configurations
-│   ├── dev/
-│   │   └── config.yaml                # Cluster metadata (name, server URL, etc.)
-│   ├── staging/
-│   │   └── config.yaml
-│   └── prod/
-│       └── config.yaml
+├── regions/                            # Regional cluster configurations
+│   ├── eu-central-1/
+│   │   └── clusters/
+│   │       ├── dev/
+│   │       │   └── config.yaml
+│   │       ├── staging/
+│   │       │   └── config.yaml
+│   │       └── prod/
+│   │           └── config.yaml
+│   └── eu-south-1/
+│       └── clusters/
+│           ├── dev/
+│           │   └── config.yaml
+│           ├── staging/
+│           │   └── config.yaml
+│           └── prod/
+│               └── config.yaml
 │
-├── codebases/                          # Codebase definitions and configurations
+├── codebases/                          # Codebase definitions (shared across regions)
 │   ├── frontend-app/
 │   │   ├── codebase.yaml              # Codebase metadata (repo URL, chart path)
-│   │   └── values/                    # Values overrides per cluster
-│   │       ├── dev.yaml
-│   │       ├── staging.yaml
-│   │       └── prod.yaml
+│   │   └── values/                    # Regional and cluster-specific overrides
+│   │       ├── eu-central-1/
+│   │       │   ├── development.yaml
+│   │       │   ├── staging.yaml
+│   │       │   └── production.yaml
+│   │       └── eu-south-1/
+│   │           ├── development.yaml
+│   │           ├── staging.yaml
+│   │           └── production.yaml
 │   ├── backend-api/
-│   │   ├── codebase.yaml
-│   │   └── values/
-│   │       ├── dev.yaml
-│   │       ├── staging.yaml
-│   │       └── prod.yaml
 │   └── data-processor/
-│       ├── codebase.yaml
-│       └── values/
-│           ├── dev.yaml
-│           ├── staging.yaml
-│           └── prod.yaml
 │
 ├── applicationsets/                    # ApplicationSet definitions
 │   ├── cluster-apps.yaml              # Generates ApplicationSets per cluster
@@ -61,20 +71,26 @@ argocd-app-of-app/
 
 ### 1. Bootstrap Layer
 
-The `bootstrap/root-appset.yaml` is the entry point. This ApplicationSet:
+Region-specific bootstrap ApplicationSets are the entry points:
 
-- Uses Git Directory generator to scan the `clusters/` directory
-- Creates one ApplicationSet per cluster
+- **eu-central-1.yaml**: Scans `regions/eu-central-1/clusters/` directory
+- **eu-south-1.yaml**: Scans `regions/eu-south-1/clusters/` directory
+
+Each bootstrap:
+- Uses Git Directory generator to scan its region's clusters
+- Creates one ApplicationSet per cluster in that region
 - Each cluster ApplicationSet will scan codebases and create Applications
 
-### 2. Cluster Definitions
+### 2. Regional Cluster Definitions
 
-Each cluster has a configuration file at `clusters/<cluster-name>/config.yaml`:
+Each cluster has a configuration file at `regions/<region>/clusters/<cluster-name>/config.yaml`:
 
 ```yaml
-# clusters/dev/config.yaml
+# regions/eu-central-1/clusters/dev/config.yaml
 cluster:
-  name: dev
+  name: euc1-dev              # Region-prefixed for uniqueness
+  region: eu-central-1        # AWS region
+  environment: development    # Environment type
   server: https://kubernetes.default.svc
   namespace: argocd
 ```
@@ -82,9 +98,8 @@ cluster:
 ### 3. Codebase Definitions
 
 Each codebase has:
-
-- A `codebase.yaml` file with metadata
-- A `values/` directory with cluster-specific overrides
+- A `codebase.yaml` file with metadata (shared across regions)
+- A `values/` directory with regional and cluster-specific overrides
 
 Example `codebases/frontend-app/codebase.yaml`:
 
@@ -95,6 +110,19 @@ codebase:
   chartPath: deploy-templates
   targetRevision: main
   namespace: frontend
+```
+
+Values structure:
+```
+codebases/frontend-app/values/
+├── eu-central-1/
+│   ├── development.yaml
+│   ├── staging.yaml
+│   └── production.yaml
+└── eu-south-1/
+    ├── development.yaml
+    ├── staging.yaml
+    └── production.yaml
 ```
 
 ### 4. ApplicationSet Pattern
