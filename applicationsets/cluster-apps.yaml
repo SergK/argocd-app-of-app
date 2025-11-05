@@ -46,6 +46,9 @@ spec:
           targetRevision: '{{default "main" .codebase.targetRevision}}'
           path: '{{.codebase.chartPath}}'
           helm:
+            # Override release name to use short codebase name instead of full Application name
+            # This keeps Helm release names clean (e.g., "frontend-app" instead of "dev-frontend-app")
+            releaseName: '{{.codebase.name}}'
             valueFiles:
               - values.yaml  # Default values from the remote chart
               # Reference values from this repository (second source)

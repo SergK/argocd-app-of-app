@@ -236,6 +236,8 @@ spec:
     - repoURL: https://github.com/myorg/frontend-app
       path: deploy-templates
       helm:
+        # Use short name for Helm release (not full Application name)
+        releaseName: frontend-app
         valueFiles:
           - values.yaml  # From remote
           - $values/codebases/frontend-app/values/dev.yaml
@@ -248,6 +250,8 @@ spec:
     server: https://kubernetes.default.svc
     namespace: frontend
 ```
+
+**Note**: The Application name is `dev-frontend-app` (cluster-codebase format), but the Helm release name is set to just `frontend-app` to keep resource names clean and consistent across all clusters.
 
 ### 4. Application Repositories
 
