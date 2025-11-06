@@ -8,7 +8,7 @@ This design enables selective deployment of codebases to clusters by creating de
 
 ## Directory Structure
 
-```
+```text
 deployments/
 ├── eu-central-1/
 │   ├── euc1-dev/
@@ -36,6 +36,7 @@ deployments/
 ### Path Parsing in ApplicationSet
 
 The ApplicationSet uses Go template path indexing:
+
 - `{{.path[0]}}` = `deployments`
 - `{{.path[1]}}` = region (e.g., `eu-central-1`)
 - `{{.path[2]}}` = cluster name (e.g., `euc1-dev`)
@@ -121,6 +122,7 @@ generators:
 ```
 
 The Matrix Generator creates Applications only for combinations where both:
+
 1. A deployment marker file exists (`deployments/{region}/{cluster}/{codebase}.yaml`)
 2. A codebase configuration exists (`codebases/{codebase}/codebase.yaml`)
 
@@ -204,6 +206,7 @@ git push
 ```
 
 **Result**:
+
 - ArgoCD detects new deployment file
 - Application `euc1-dev-new-api` is created
 - Deploys from `main` branch (as defined in codebase.yaml)
@@ -230,6 +233,7 @@ git push
 ```
 
 **Result**:
+
 - Application `euc1-staging-new-api` is created
 - Deploys from `v1.0.0` tag (as defined in codebase.yaml)
 - Uses values from `codebases/new-api/values/eu-central-1/staging.yaml`
@@ -297,6 +301,7 @@ git push
 ```
 
 **Result**:
+
 - Only `euc1-prod-frontend-app` uses the hotfix branch
 - All other clusters (staging, dev, other regions) continue using their configured versions
 - When hotfix is merged and tagged, remove the override to return to normal versioning
@@ -395,6 +400,7 @@ The ApplicationSet resolves `targetRevision` with the following precedence:
 2. **Codebase Matrix** (default): `codebase.targetRevisions[region][environment]` from codebase.yaml
 
 Template logic:
+
 ```yaml
 targetRevision: '{{if .deployment.targetRevision}}{{.deployment.targetRevision}}{{else}}{{index (index .codebase.targetRevisions .path[1]) .cluster.environment}}{{end}}'
 ```
@@ -402,14 +408,17 @@ targetRevision: '{{if .deployment.targetRevision}}{{.deployment.targetRevision}}
 ## Comparison with Other Approaches
 
 ### vs. List Generator
+
 - **List Generator**: Can't iterate over arrays in YAML files, requires one file per combination
 - **This Design**: Matrix naturally combines files, clean separation of concerns
 
 ### vs. Directory-Based Tiers
+
 - **Directory Tiers**: `codebases-dev/`, `codebases-staging/`, `codebases-prod/` - organized by maturity
 - **This Design**: Organized by cluster, more flexible for per-cluster decisions
 
 ### vs. Pure Matrix (Previous Design)
+
 - **Pure Matrix**: Creates Applications for ALL cluster × codebase combinations
 - **This Design**: Only creates Applications where deployment file exists
 
@@ -489,6 +498,7 @@ deployment:
 ```
 
 Reference in ApplicationSet:
+
 ```yaml
 valueFiles:
   - values.yaml
@@ -532,6 +542,7 @@ deployment:
 **Problem**: Created deployment file but Application doesn't appear
 
 **Checks**:
+
 1. Verify file path follows pattern: `deployments/{region}/{cluster}/{codebase}.yaml`
 2. Confirm codebase.yaml exists at `codebases/{codebase}/codebase.yaml`
 3. Check ArgoCD ApplicationSet controller logs
@@ -542,6 +553,7 @@ deployment:
 **Problem**: Application deploys different version than expected
 
 **Checks**:
+
 1. Check if deployment file has `targetRevision` override
 2. Verify `environment` in deployment file matches expected environment
 3. Confirm targetRevisions matrix in codebase.yaml has entry for this region+environment
@@ -552,6 +564,7 @@ deployment:
 **Problem**: Application created but sync fails
 
 **Checks**:
+
 1. Verify `cluster.server` URL is correct and reachable
 2. Check namespace exists or `CreateNamespace=true` is set
 3. Verify values file exists: `codebases/{codebase}/values/{region}/{environment}.yaml`

@@ -50,6 +50,7 @@ kubectl apply -f bootstrap/eu-south-1.yaml -n argocd
 ```
 
 Each bootstrap will:
+
 - Scan deployment directories in `deployments/{region}/`
 - Create one ApplicationSet per cluster
 - Each ApplicationSet scans deployment markers for that cluster
@@ -64,6 +65,7 @@ kubectl get applicationsets -n argocd
 ```
 
 Expected output (for eu-central-1):
+
 ```
 NAME                  AGE
 euc1-dev-apps         1m
@@ -78,6 +80,7 @@ kubectl get applications -n argocd
 ```
 
 You should see Applications like:
+
 - `euc1-dev-frontend-app`
 - `euc1-staging-frontend-app`
 - `euc1-prod-frontend-app`
@@ -344,6 +347,7 @@ targetRevisions:
 ```
 
 If no override exists in the deployment marker file:
+
 - `euc1-dev` deploys from `main`
 - `euc1-staging` deploys from `v1.3.0`
 - `euc1-prod` deploys from `v1.2.0`
